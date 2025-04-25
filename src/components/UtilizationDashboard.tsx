@@ -4,19 +4,37 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { employeesData } from '@/data/employees';
-import { calculateUtilization, processNaturalLanguageQuery } from '@/utils/utilizationUtils';
+import { calculateUtilization } from '@/utils/utilizationUtils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Search } from 'lucide-react';
+import { useLLMQuery } from '@/hooks/useLLMQuery';
+import { toast } from "sonner";
 
 const UtilizationDashboard = () => {
   const [query, setQuery] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [queryResult, setQueryResult] = useState('');
-
+  
   const utilizationData = employeesData.map(calculateUtilization);
+  const { queryLLM, isLoading, error } = useLLMQuery(utilizationData);
 
-  const handleQuery = () => {
-    const result = processNaturalLanguageQuery(query, utilizationData);
-    setQueryResult(result);
+  const handleQuery = async () => {
+    if (!apiKey) {
+      toast.error("Please enter your Perplexity API key");
+      return;
+    }
+
+    if (!query.trim()) {
+      toast.error("Please enter a query");
+      return;
+    }
+
+    const result = await queryLLM(query, apiKey);
+    if (result) {
+      setQueryResult(result);
+    } else if (error) {
+      toast.error(error);
+    }
   };
 
   return (
@@ -24,17 +42,26 @@ const UtilizationDashboard = () => {
       <h1 className="text-3xl font-bold mb-8 text-center">Resource Utilization Dashboard</h1>
       
       <div className="mb-8">
-        <div className="flex gap-4 mb-4">
+        <div className="flex flex-col gap-4 mb-4">
           <Input
-            placeholder="Ask about resource utilization (e.g., 'Who is overutilized?')"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            type="password"
+            placeholder="Enter your Perplexity API key"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
             className="flex-1"
           />
-          <Button onClick={handleQuery}>
-            <Search className="mr-2 h-4 w-4" />
-            Query
-          </Button>
+          <div className="flex gap-4">
+            <Input
+              placeholder="Ask about resource utilization (e.g., 'Who is overutilized and why?')"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={handleQuery} disabled={isLoading}>
+              <Search className="mr-2 h-4 w-4" />
+              {isLoading ? 'Analyzing...' : 'Query'}
+            </Button>
+          </div>
         </div>
         {queryResult && (
           <Card className="p-4 bg-secondary">
