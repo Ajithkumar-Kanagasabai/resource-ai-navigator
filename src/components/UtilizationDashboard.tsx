@@ -14,6 +14,7 @@ const UtilizationDashboard = () => {
   const [query, setQuery] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [queryResult, setQueryResult] = useState('');
+  const [messages, setMessages] = useState<Array<{type: 'user' | 'bot', content: string}>>([]);
   
   const utilizationData = employeesData.map(calculateUtilization);
   const { queryLLM, isLoading, error } = useLLMQuery(utilizationData);
@@ -29,49 +30,41 @@ const UtilizationDashboard = () => {
       return;
     }
 
+    // Add user message
+    setMessages(prev => [...prev, { type: 'user', content: query }]);
+
     const result = await queryLLM(query, apiKey);
     if (result) {
+      setMessages(prev => [...prev, { type: 'bot', content: result }]);
       setQueryResult(result);
     } else if (error) {
       toast.error(error);
     }
+    setQuery('');
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-center">Resource Utilization Dashboard</h1>
-      
-      <div className="mb-8">
-        <div className="flex flex-col gap-4 mb-4">
-          <Input
-            type="password"
-            placeholder="Enter your Perplexity API key"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            className="flex-1"
-          />
-          <div className="flex gap-4">
-            <Input
-              placeholder="Ask about resource utilization (e.g., 'Who is overutilized and why?')"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="flex-1"
-            />
-            <Button onClick={handleQuery} disabled={isLoading}>
-              <Search className="mr-2 h-4 w-4" />
-              {isLoading ? 'Analyzing...' : 'Query'}
-            </Button>
+    <div className="h-full flex flex-col">
+      <div className="flex-1 overflow-auto space-y-4 p-4">
+        {/* Messages */}
+        {messages.map((message, index) => (
+          <div
+            key={index}
+            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <Card
+              className={`max-w-[80%] p-4 ${
+                message.type === 'user' 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-secondary'
+              }`}
+            >
+              <p>{message.content}</p>
+            </Card>
           </div>
-        </div>
-        {queryResult && (
-          <Card className="p-4 bg-secondary">
-            <p>{queryResult}</p>
-          </Card>
-        )}
-      </div>
+        ))}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Utilization Chart */}
+        {/* Charts and Stats */}
         <Card className="p-4">
           <h2 className="text-xl font-semibold mb-4">Resource Utilization Rates</h2>
           <div className="h-[400px]">
@@ -90,30 +83,27 @@ const UtilizationDashboard = () => {
             </ResponsiveContainer>
           </div>
         </Card>
+      </div>
 
-        {/* Status Summary */}
-        <Card className="p-4">
-          <h2 className="text-xl font-semibold mb-4">Utilization Status</h2>
-          <div className="space-y-4">
-            {utilizationData.map((data) => (
-              <div
-                key={data.employee.EmployeeID}
-                className={`p-4 rounded-lg ${
-                  data.status === 'Overutilized'
-                    ? 'bg-red-100 text-red-800'
-                    : data.status === 'Underutilized'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-green-100 text-green-800'
-                }`}
-              >
-                <p className="font-semibold">{data.employee.Name}</p>
-                <p>{data.employee.Role}</p>
-                <p>Utilization: {data.utilizationRate.toFixed(1)}%</p>
-                <p>Status: {data.status}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
+      {/* Input Area */}
+      <div className="border-t p-4 space-y-4">
+        <Input
+          type="password"
+          placeholder="Enter your Perplexity API key"
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+        />
+        <div className="flex gap-2">
+          <Input
+            placeholder="Ask about resource utilization..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleQuery()}
+          />
+          <Button onClick={handleQuery} disabled={isLoading}>
+            <Search className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );
